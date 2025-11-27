@@ -49,7 +49,9 @@ export class WhatsAppService {
       `📦 ${product.title} (${product.color}, ${product.size}) - Qty: ${product.quantity} - $${product.price}`
     ).join('%0A');
 
-    const total = subtotal + 5 + subtotal / 5;
+    const shipping = 5;
+    const taxes = subtotal / 5;
+    const total = subtotal + shipping + taxes;
 
     return `
 🛒 *NEW ORDER CONFIRMATION* 🛒
@@ -57,7 +59,7 @@ export class WhatsAppService {
 *Order Details:*
 📅 Date: ${orderDate}
 🔄 Status: ${orderStatus}
-💰 Total: $${total}
+💰 Total: $${total.toFixed(2)}
 %0A%0A
 *Customer Information:*
 👤 Name: ${data.firstName} ${data.lastName}
@@ -74,10 +76,10 @@ export class WhatsAppService {
 ${productList}
 %0A%0A
 *Order Summary:*
-💵 Subtotal: $${subtotal}
-🚚 Shipping: $5
-🏛️ Taxes: $${subtotal / 5}
-💳 *Total: $${total}*
+💵 Subtotal: $${subtotal.toFixed(2)}
+🚚 Shipping: $${shipping.toFixed(2)}
+🏛️ Taxes: $${taxes.toFixed(2)}
+💳 *Total: $${total.toFixed(2)}*
 %0A%0A
 *Payment Method:*
 💳 ${data.paymentType}
@@ -102,12 +104,28 @@ _This order was generated automatically_
   }
 
   // Method to send with file attachment (if needed)
-  async sendWithAttachment(orderData: OrderData, file?: File): Promise<void> {
+  async sendWithAttachment(orderData: OrderData): Promise<void> {
     const message = this.formatOrderMessage(orderData);
-    let url = `https://wa.me/${this.phoneNumber}?text=${message}`;
+    const url = `https://wa.me/${this.phoneNumber}?text=${message}`;
     
     // Note: File attachments in WhatsApp Web have limitations
     // This would typically work better with the WhatsApp Business API
     window.open(url, '_blank');
+  }
+
+  // Method to update the phone number dynamically
+  setPhoneNumber(phoneNumber: string): void {
+    this.phoneNumber = phoneNumber.replace(/\D/g, ''); // Remove non-digit characters
+  }
+
+  // Get current phone number
+  getPhoneNumber(): string {
+    return this.phoneNumber;
+  }
+
+  // Method to validate phone number
+  isValidPhoneNumber(phoneNumber: string): boolean {
+    const cleanNumber = phoneNumber.replace(/\D/g, '');
+    return cleanNumber.length >= 10 && cleanNumber.length <= 15;
   }
 }

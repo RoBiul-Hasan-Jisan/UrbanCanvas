@@ -6,25 +6,7 @@ import customFetch from "../axios/custom";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { checkCheckoutFormData } from "../utils/checkCheckoutFormData";
-
-/*
-address: "Marka Markovic 22"
-apartment: "132"
-cardNumber: "21313"
-city: "Belgrade"
-company: "Bojan Cesnak"
-country: "United States"
-cvc: "122"
-emailAddress: "kuzma@gmail.com"
-expirationDate: "12312"
-firstName: "Aca22"
-lastName: "Kuzma"
-nameOnCard: "Aca JK"
-paymentType: "on"
-phone: "06123123132"
-postalCode: "11080"
-region: "Serbia"
-*/
+import { WhatsAppService, OrderData } from "../services/whatsappService.ts";
 
 const paymentMethods = [
   { id: "credit-card", title: "Credit card" },
@@ -36,6 +18,7 @@ const Checkout = () => {
   const { productsInCart, subtotal } = useAppSelector((state) => state.cart);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const whatsappService = WhatsAppService.getInstance();
 
   const handleCheckoutSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,8 +34,11 @@ const Checkout = () => {
     if (!checkCheckoutFormData(checkoutData)) return;
 
     let response;
+    let orderData: OrderData;
+
+    // Prepare order data
     if (JSON.parse(localStorage.getItem("user") || "{}").email) {
-      response = await customFetch.post("/orders", {
+      orderData = {
         ...checkoutData,
         user: {
           email: JSON.parse(localStorage.getItem("user") || "{}").email,
@@ -60,19 +46,38 @@ const Checkout = () => {
         },
         orderStatus: "Processing",
         orderDate: new Date().toISOString(),
-      });
+      };
     } else {
-      response = await customFetch.post("/orders", {
+      orderData = {
         ...checkoutData,
         orderStatus: "Processing",
         orderDate: new Date().toLocaleDateString(),
-      });
+      };
     }
 
-    if (response.status === 201) {
-      toast.success("Order has been placed successfully");
-      navigate("/order-confirmation");
-    } else {
+    try {
+      // First, save order to database
+      response = await customFetch.post("/orders", orderData);
+
+      if (response.status === 201) {
+        // Then send to WhatsApp
+        const whatsappSuccess = await whatsappService.sendOrderToWhatsApp(orderData);
+        
+        if (whatsappSuccess) {
+          toast.success("Order placed! Opening WhatsApp to share order details...");
+        } else {
+          toast.success("Order placed successfully!");
+        }
+        
+        // Navigate after a short delay to see the toast
+        setTimeout(() => {
+          navigate("/order-confirmation");
+        }, 2000);
+      } else {
+        toast.error("Something went wrong, please try again later");
+      }
+    } catch (error) {
+      console.error('Order submission error:', error);
       toast.error("Something went wrong, please try again later");
     }
   };
@@ -527,4 +532,5 @@ const Checkout = () => {
     </div>
   );
 };
+
 export default Checkout;

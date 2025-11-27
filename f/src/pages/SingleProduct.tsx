@@ -31,14 +31,14 @@ const SingleProduct = () => {
   useEffect(() => {
     const fetchSingleProduct = async () => {
       const response = await fetch(
-        `http://localhost:5000/products/${params.id}`
+        `https://urbancanvas.onrender.com/products/${params.id}`
       );
       const data = await response.json();
       setSingleProduct(data);
     };
 
     const fetchProducts = async () => {
-      const response = await fetch("http://localhost:5000/products");
+      const response = await fetch("https://urbancanvas.onrender.com/products");
       const data = await response.json();
       setProducts(data);
     };

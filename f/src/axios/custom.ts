@@ -1,11 +1,10 @@
-// axios/custom.ts
 import axios from "axios";
 
-const customFetch = axios.create({
-    baseURL: "http://localhost:5000", 
-    headers: {
-        Accept: "application/json"
-    }
-})
+const API_URL = "https://urbancanvas.onrender.com"; 
 
-export default customFetch;
+const custom = axios.create({
+  baseURL: API_URL,
+  headers: { Accept: "application/json" }
+});
+
+export default custom;

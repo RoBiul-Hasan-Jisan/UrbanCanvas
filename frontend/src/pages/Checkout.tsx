@@ -1,12 +1,12 @@
 import React, { useState } from 'react'; // Added React import
 import { HiTrash as TrashIcon } from "react-icons/hi2";
-import { Button } from "../components";
-import { useAppDispatch, useAppSelector } from "../hooks";
-import { removeProductFromTheCart } from "../features/cart/cartSlice";
-import customFetch from "../axios/custom";
+import { Button } from "../components/index.ts";
+import { useAppDispatch, useAppSelector } from "../hooks/index.ts";
+import { removeProductFromTheCart } from "../features/cart/cartSlice.tsx";
+import customFetch from "../axios/custom.ts";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { checkCheckoutFormData } from "../utils/checkCheckoutFormData";
+import { checkCheckoutFormData } from "../utils/checkCheckoutFormData.ts";
 import { WhatsAppService, OrderData } from "../services/whatsappService.ts";
 
 const paymentMethods = [

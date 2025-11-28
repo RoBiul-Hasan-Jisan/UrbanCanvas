@@ -3,7 +3,7 @@ import {
   ProductGridWrapper,
   ShopFilterAndSort,
   ShowingPagination,
-} from "../components";
+} from ".";
 
 import { useState } from "react";
 

@@ -1,3 +1,4 @@
+import React, { useState } from 'react'; // Added React import
 import { HiTrash as TrashIcon } from "react-icons/hi2";
 import { Button } from "../components";
 import { useAppDispatch, useAppSelector } from "../hooks";
@@ -9,6 +10,8 @@ import { checkCheckoutFormData } from "../utils/checkCheckoutFormData";
 import { WhatsAppService, OrderData } from "../services/whatsappService.ts";
 
 const paymentMethods = [
+  { id: "cash-on-delivery", title: "Cash on Delivery" },
+  { id: "bikash", title: "Bikash" },
   { id: "credit-card", title: "Credit card" },
   { id: "paypal", title: "PayPal" },
   { id: "etransfer", title: "eTransfer" },
@@ -19,6 +22,53 @@ const Checkout = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const whatsappService = WhatsAppService.getInstance();
+  const [selectedPayment, setSelectedPayment] = useState("cash-on-delivery"); // Moved inside component
+
+  const formatOrderMessage = (orderData: any) => {
+    const { data, products, subtotal } = orderData;
+    const shipping = 5;
+    const taxes = subtotal / 5;
+    const total = subtotal + shipping + taxes;
+
+    let message = `🛒 *NEW ORDER RECEIVED* 🛒\n\n`;
+    
+    // Customer Information
+    message += `*Customer Details:*\n`;
+    message += `👤 Name: ${data.firstName} ${data.lastName}\n`;
+    message += `📞 Phone: ${data.phone}\n`;
+    message += `📍 Address: ${data.address}, ${data.city}, ${data.region}, ${data.country} - ${data.postalCode}\n\n`;
+    
+    // Order Items
+    message += `*Order Items:*\n`;
+    products.forEach((product: any, index: number) => {
+      message += `${index + 1}. ${product.title}\n`;
+      message += `   Color: ${product.color} | Size: ${product.size}\n`;
+      message += `   Price: $${product.price} x ${product.quantity} = $${product.price * product.quantity}\n\n`;
+    });
+    
+    // Payment Information
+    message += `*Payment Method:* ${data.paymentType}\n`;
+    if (data.paymentType === 'bikash' && data.bikashNumber) {
+      message += `Bikash Number: ${data.bikashNumber}\n`;
+    }
+    if (data.paymentType === 'credit-card' && data.nameOnCard) {
+      message += `Card Holder: ${data.nameOnCard}\n`;
+    }
+    message += `\n`;
+    
+    // Order Summary
+    message += `*Order Summary:*\n`;
+    message += `Subtotal: $${subtotal.toFixed(2)}\n`;
+    message += `Shipping: $${shipping.toFixed(2)}\n`;
+    message += `Taxes: $${taxes.toFixed(2)}\n`;
+    message += `*Total: $${total.toFixed(2)}*\n\n`;
+    
+    // Order Meta
+    message += `Order Date: ${new Date().toLocaleString()}\n`;
+    message += `Order ID: #${Date.now().toString().slice(-6)}`;
+    
+    return message;
+  };
 
   const handleCheckoutSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,25 +110,171 @@ const Checkout = () => {
       response = await customFetch.post("/orders", orderData);
 
       if (response.status === 201) {
-        // Then send to WhatsApp
-        const whatsappSuccess = await whatsappService.sendOrderToWhatsApp(orderData);
+        // Format and send WhatsApp message
+        const whatsappMessage = formatOrderMessage(orderData);
+        const phoneNumber = "+8801839502332"; // Bangladeshi number
         
-        if (whatsappSuccess) {
-          toast.success("Order placed! Opening WhatsApp to share order details...");
+        // Send to WhatsApp - Fixed: using only one argument
+        const whatsappSuccess = await whatsappService.sendOrderToWhatsApp(orderData);
+
+        // Handle different payment methods
+        const paymentMethod = data.paymentType as string;
+        
+        if (paymentMethod === "cash-on-delivery") {
+          toast.success("Order placed! Payment will be collected on delivery.");
+        } else if (paymentMethod === "bikash") {
+          toast.success("Order placed! Please complete payment via Bikash.");
         } else {
           toast.success("Order placed successfully!");
+        }
+
+        if (whatsappSuccess) {
+          toast.success("Order details sent to WhatsApp!");
+          
+          // Open WhatsApp with pre-filled message
+          const encodedMessage = encodeURIComponent(whatsappMessage);
+          const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+          window.open(whatsappUrl, '_blank');
+        } else {
+          toast.success("Order placed! You can manually share details via WhatsApp.");
         }
         
         // Navigate after a short delay to see the toast
         setTimeout(() => {
           navigate("/order-confirmation");
-        }, 2000);
+        }, 3000);
       } else {
         toast.error("Something went wrong, please try again later");
       }
     } catch (error) {
       console.error('Order submission error:', error);
       toast.error("Something went wrong, please try again later");
+    }
+  };
+
+  const renderPaymentFields = () => {
+    switch (selectedPayment) {
+      case "credit-card":
+        return (
+          <div className="mt-6 grid grid-cols-4 gap-x-4 gap-y-6">
+            <div className="col-span-4">
+              <label
+                htmlFor="card-number"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Card number
+              </label>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  id="card-number"
+                  name="cardNumber"
+                  autoComplete="cc-number"
+                  className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
+                  required={true}
+                />
+              </div>
+            </div>
+
+            <div className="col-span-4">
+              <label
+                htmlFor="name-on-card"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Name on card
+              </label>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  id="name-on-card"
+                  name="nameOnCard"
+                  autoComplete="cc-name"
+                  className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
+                  required={true}
+                />
+              </div>
+            </div>
+
+            <div className="col-span-3">
+              <label
+                htmlFor="expiration-date"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Expiration date (MM/YY)
+              </label>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  name="expirationDate"
+                  id="expiration-date"
+                  autoComplete="cc-exp"
+                  className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
+                  required={true}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="cvc"
+                className="block text-sm font-medium text-gray-700"
+              >
+                CVC
+              </label>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  name="cvc"
+                  id="cvc"
+                  autoComplete="csc"
+                  className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
+                  required={true}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      
+      case "bikash":
+        return (
+          <div className="mt-6 space-y-4">
+            <div>
+              <label
+                htmlFor="bikash-number"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Bikash Phone Number
+              </label>
+              <div className="mt-1">
+                <input
+                  type="tel"
+                  id="bikash-number"
+                  name="bikashNumber"
+                  placeholder="01XXX-XXXXXX"
+                  className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
+                  required={true}
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800">
+                <strong>Payment Instructions:</strong> After order confirmation, you will receive a payment request on your Bikash number. Please complete the payment to confirm your order.
+              </p>
+            </div>
+          </div>
+        );
+      
+      case "cash-on-delivery":
+        return (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-sm text-green-800">
+              <strong>Cash on Delivery:</strong> Pay when you receive your order. Our delivery agent will collect the payment at your doorstep.
+            </p>
+          </div>
+        );
+      
+      default:
+        return null;
     }
   };
 
@@ -93,27 +289,10 @@ const Checkout = () => {
         >
           <div>
             <div>
-              <h2 className="text-lg font-medium text-gray-900">
-                Contact information
-              </h2>
-
-              <div className="mt-4">
-                <label
-                  htmlFor="email-address"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Email address
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="email"
-                    id="email-address"
-                    name="emailAddress"
-                    autoComplete="email"
-                    className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                    required={true}
-                  />
-                </div>
+              <div className="mt-12">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Information
+                </h1>
               </div>
             </div>
 
@@ -136,7 +315,7 @@ const Checkout = () => {
                       id="first-name"
                       name="firstName"
                       autoComplete="given-name"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -155,25 +334,7 @@ const Checkout = () => {
                       id="last-name"
                       name="lastName"
                       autoComplete="family-name"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label
-                    htmlFor="company"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Company
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="company"
-                      id="company"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -192,25 +353,7 @@ const Checkout = () => {
                       name="address"
                       id="address"
                       autoComplete="street-address"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label
-                    htmlFor="apartment"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Apartment, suite, etc.
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="apartment"
-                      id="apartment"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -229,7 +372,7 @@ const Checkout = () => {
                       name="city"
                       id="city"
                       autoComplete="address-level2"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -247,12 +390,10 @@ const Checkout = () => {
                       id="country"
                       name="country"
                       autoComplete="country-name"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     >
-                      <option>United States</option>
-                      <option>Canada</option>
-                      <option>Mexico</option>
+                      <option>Bangladesh</option>
                     </select>
                   </div>
                 </div>
@@ -270,7 +411,7 @@ const Checkout = () => {
                       name="region"
                       id="region"
                       autoComplete="address-level1"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -289,7 +430,7 @@ const Checkout = () => {
                       name="postalCode"
                       id="postal-code"
                       autoComplete="postal-code"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -308,7 +449,7 @@ const Checkout = () => {
                       name="phone"
                       id="phone"
                       autoComplete="tel"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
+                      className="block w-full py-2 indent-2 border border-gray-300 outline-none focus:border-gray-400 shadow-sm sm:text-sm"
                       required={true}
                     />
                   </div>
@@ -325,23 +466,15 @@ const Checkout = () => {
                 <div className="space-y-4 sm:flex sm:items-center sm:space-x-10 sm:space-y-0">
                   {paymentMethods.map((paymentMethod, paymentMethodIdx) => (
                     <div key={paymentMethod.id} className="flex items-center">
-                      {paymentMethodIdx === 0 ? (
-                        <input
-                          id={paymentMethod.id}
-                          name="paymentType"
-                          type="radio"
-                          defaultChecked
-                          className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                      ) : (
-                        <input
-                          id={paymentMethod.id}
-                          name="paymentType"
-                          type="radio"
-                          className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                      )}
-
+                      <input
+                        id={paymentMethod.id}
+                        name="paymentType"
+                        type="radio"
+                        value={paymentMethod.id}
+                        defaultChecked={paymentMethodIdx === 0}
+                        onChange={(e) => setSelectedPayment(e.target.value)}
+                        className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
                       <label
                         htmlFor={paymentMethod.id}
                         className="ml-3 block text-sm font-medium text-gray-700"
@@ -353,83 +486,7 @@ const Checkout = () => {
                 </div>
               </fieldset>
 
-              <div className="mt-6 grid grid-cols-4 gap-x-4 gap-y-6">
-                <div className="col-span-4">
-                  <label
-                    htmlFor="card-number"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Card number
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      id="card-number"
-                      name="cardNumber"
-                      autoComplete="cc-number"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-span-4">
-                  <label
-                    htmlFor="name-on-card"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Name on card
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      id="name-on-card"
-                      name="nameOnCard"
-                      autoComplete="cc-name"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-span-3">
-                  <label
-                    htmlFor="expiration-date"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Expiration date (MM/YY)
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="expirationDate"
-                      id="expiration-date"
-                      autoComplete="cc-exp"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="cvc"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    CVC
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="cvc"
-                      id="cvc"
-                      autoComplete="csc"
-                      className="block w-full py-2 indent-2 border-gray-300 outline-none focus:border-gray-400 border border shadow-sm sm:text-sm"
-                      required={true}
-                    />
-                  </div>
-                </div>
-              </div>
+              {renderPaymentFields()}
             </div>
           </div>
 
